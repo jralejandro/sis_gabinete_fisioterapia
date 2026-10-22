@@ -1,0 +1,61 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: laravel-app
+    volumes:
+      - ./:/var/www/html
+    networks:
+      - laravel
+    working_dir: /var/www/html
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - app
+    networks:
+      - laravel
+
+  db:
+    image: mysql:8.1
+    container_name: gabinete_fisio-db
+    environment:
+      MYSQL_ROOT_PASSWORD: gabin3t3.F1s1o@
+      MYSQL_DATABASE: gabinete_fisio
+      MYSQL_USER: gabinete_fisio
+      MYSQL_PASSWORD: TecMed.2025@
+    ports:
+      - "3306:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+    networks:
+      - laravel
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      PMA_HOST: db
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+    networks:
+      - laravel
+
+volumes:
+  dbdata:
+
+networks:
+  laravel:
+    driver: bridge
