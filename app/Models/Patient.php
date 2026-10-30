@@ -12,8 +12,24 @@ class Patient extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['ci', 'complemento', 'nombres', 'apellido_paterno', 'apellido_materno', 'sexo', 'ocupacion', 'fecha_nacimiento', 'domicilio', 'estado_civil', 'celular', 'persona_referencia', 'celular_referencia', 'estado', 'user_id'];
-
+    protected $fillable = [
+        'ci',
+        'complemento',
+        'nombres',
+        'apellido_paterno',
+        'apellido_materno',
+        'sexo',
+        'ocupacion',
+        'fecha_nacimiento',
+        'domicilio',
+        'estado_civil',
+        'celular',
+        'persona_referencia',
+        'celular_referencia',
+        'medio_contacto', // 🔥 AGREGAMOS ESTE
+        'estado',
+        'user_id'
+    ];
     public function user()
     {
         return $this->belongsTo(User::class);

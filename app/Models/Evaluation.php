@@ -38,6 +38,7 @@ class Evaluation extends Model
         'balance_muscular',
         'sensibilidad',
         'examenes_complementarios',
+        'archivo_examen_complementario',
         'diagnostico_kinesico',
         'objetivos_tratamiento',
         'plan_tratamiento',
