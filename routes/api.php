@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\TherapySessionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\BackupController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -71,4 +72,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // 🔥 Obtener el expediente completo de 1 paciente
     Route::get('/reports/patients/{id}/full', [ReportController::class, 'patientFullData']);
+
+    // 🔒 RESPALDOS (Solo Admin)
+    Route::middleware('can:gestionar-backups')->prefix('backups')->group(function () {
+        Route::get('/', [BackupController::class, 'index']);
+        Route::post('/', [BackupController::class, 'store']);
+        Route::get('/{filename}/download', [BackupController::class, 'download']);
+        Route::delete('/{filename}', [BackupController::class, 'destroy']);
+    });
 });

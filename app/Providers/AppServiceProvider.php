@@ -59,5 +59,16 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('ver-reportes', function (User $user) {
             return $user->cargo->in([Cargo::KINESIOLOGO, Cargo::ESTUDIANTE]);
         });
+
+        // Respaldos de BD y archivos: exclusivo del Admin.
+        // Se compara de forma segura porque `cargo` puede llegar como Enum o como string,
+        // y en la BD existen valores heredados ("Administrador") además del Enum ("admin").
+        Gate::define('gestionar-backups', function (User $user) {
+            $cargo = $user->cargo instanceof Cargo
+                ? $user->cargo->value
+                : strtolower(trim((string) $user->cargo));
+
+            return in_array($cargo, [Cargo::ADMIN->value, 'administrador'], true);
+        });
     }
 }
