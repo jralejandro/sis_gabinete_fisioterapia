@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Enums\Cargo;
 
 use Laravel\Sanctum\HasApiTokens;
 
@@ -32,7 +33,7 @@ class User extends Authenticatable
         'nro_celular',
         'direccion',
         'email',
-        'cargo',
+        'cargo' => Cargo::class,
         'nivel_academico',
         'profesion',
         'estado',
