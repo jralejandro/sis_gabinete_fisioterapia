@@ -117,8 +117,9 @@ class DashboardController extends Controller
         /* ============================================================
          * 6. ESTADO DE EVALUACIONES
          * ============================================================ */
-        $estadosEvaluacion = Evaluation::select('estado', DB::raw('COUNT(*) as total'))
-            ->groupBy('estado')
+        $estadosEvaluacion = Evaluation::select(DB::raw('UPPER(TRIM(estado)) as estado'), DB::raw('COUNT(*) as total'))
+            ->whereNotNull('estado')
+            ->groupBy(DB::raw('UPPER(TRIM(estado))'))
             ->pluck('total', 'estado');
 
         $cantidadActivos  = $estadosEvaluacion['ACTIVO']   ?? 0;
@@ -146,7 +147,7 @@ class DashboardController extends Controller
         $ocupacionesData   = $topOcupaciones->pluck('total')->values();
 
         /* ============================================================
-         * 7.5 TOP 10 CENTROS DE REFERENCIA (NUEVO)
+         * 7.5 TOP 10 CENTROS DE REFERENCIA
          * ============================================================ */
         $topCentros = Evaluation::select('centro_referencia', DB::raw('count(*) as total'))
             ->whereNotNull('centro_referencia')
@@ -158,6 +159,37 @@ class DashboardController extends Controller
 
         $centrosLabels = $topCentros->pluck('centro_referencia')->values();
         $centrosData   = $topCentros->pluck('total')->values();
+
+        $evaluacionesConReferencia = Evaluation::whereNotNull('centro_referencia')
+            ->where('centro_referencia', '!=', '')
+            ->count();
+        $evaluacionesParticulares  = max(0, $totalEvaluaciones - $evaluacionesConReferencia);
+
+        /* ============================================================
+         * 7.6 MEDIOS DE CAPTACIÓN (¿Cómo se enteró del Gabinete?)
+         * ============================================================ */
+        $mediosContactoStats = Patient::select('medio_contacto', DB::raw('count(*) as total'))
+            ->whereNotNull('medio_contacto')
+            ->where('medio_contacto', '!=', '')
+            ->groupBy('medio_contacto')
+            ->orderByDesc('total')
+            ->get();
+
+        $mediosContactoLabels = $mediosContactoStats->pluck('medio_contacto')->values();
+        $mediosContactoData   = $mediosContactoStats->pluck('total')->values();
+
+        // Top respuestas manuales cuando seleccionan "Otro"
+        $mediosContactoOtros = Patient::select('medio_contacto_otro', DB::raw('count(*) as total'))
+            ->where('medio_contacto', 'Otro')
+            ->whereNotNull('medio_contacto_otro')
+            ->where('medio_contacto_otro', '!=', '')
+            ->groupBy('medio_contacto_otro')
+            ->orderByDesc('total')
+            ->limit(5)
+            ->get();
+
+        $pacientesConMedioContacto = (int) $mediosContactoStats->sum('total');
+        $pacientesSinMedioContacto = max(0, $totalPacientes - $pacientesConMedioContacto);
 
         /* ============================================================
          * 8. RESPUESTA API JSON PARA REACT
@@ -186,6 +218,13 @@ class DashboardController extends Controller
             'ocupacionesData'                 => $ocupacionesData,
             'centrosLabels'                   => $centrosLabels,
             'centrosData'                     => $centrosData,
+            'evaluacionesConReferencia'       => $evaluacionesConReferencia,
+            'evaluacionesParticulares'        => $evaluacionesParticulares,
+            'mediosContactoLabels'            => $mediosContactoLabels,
+            'mediosContactoData'              => $mediosContactoData,
+            'mediosContactoOtros'             => $mediosContactoOtros,
+            'pacientesConMedioContacto'       => $pacientesConMedioContacto,
+            'pacientesSinMedioContacto'       => $pacientesSinMedioContacto,
         ], 200);
     }
 }
