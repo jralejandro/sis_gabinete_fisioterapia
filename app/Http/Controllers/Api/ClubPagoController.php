@@ -97,6 +97,7 @@ class ClubPagoController extends Controller
                 'estado'            => $m->estado,
                 'fecha_inscripcion' => $m->fecha_inscripcion->format('Y-m-d'),
                 'fecha_baja'        => $m->fecha_baja?->format('Y-m-d'),
+                'pago_matricula'    => (int) $m->pago_matricula,
                 'patient'           => $m->patient,
                 'grupo'             => $m->grupo,
                 'meses'             => $meses,
@@ -136,15 +137,16 @@ class ClubPagoController extends Controller
     public function store(Request $request, ClubMiembro $miembro)
     {
         $data = $request->validate([
-            'periodos'          => 'required|array|min:1|max:24',
+            'periodos'          => 'nullable|array|max:24',
             'periodos.*'        => ['required', 'string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/', 'distinct'],
             'monto'             => 'required|integer|min:0|max:10000',
             'fecha_pago'        => 'required|date|before_or_equal:today',
             'nro_recibo'        => 'nullable|string|max:50',
             'observaciones'     => 'nullable|string|max:255',
             'eximir_anteriores' => 'nullable|boolean',
+            'cobrar_matricula'  => 'nullable|boolean',
+            'monto_matricula'   => 'nullable|integer|min:1|max:10000',
         ], [
-            'periodos.required'     => 'Seleccione al menos un mes a pagar.',
             'periodos.*.regex'      => 'El mes seleccionado no tiene un formato válido.',
             'periodos.*.distinct'   => 'Hay meses repetidos en la selección.',
             'monto.required'        => 'El monto es obligatorio.',
@@ -153,13 +155,21 @@ class ClubPagoController extends Controller
             'fecha_pago.before_or_equal' => 'La fecha de pago no puede ser futura.',
         ]);
 
+        $cobrarMatricula = !empty($data['cobrar_matricula']);
+        $montoMatricula = $cobrarMatricula ? (int) ($data['monto_matricula'] ?? 50) : 0;
+        $periodosRaw = $data['periodos'] ?? [];
+
+        if (empty($periodosRaw) && !$cobrarMatricula) {
+            return $this->errorPeriodo('Seleccione al menos un mes a pagar o marque la regularización de matrícula.');
+        }
+
         $inicio = $miembro->fecha_inscripcion->copy()->startOfMonth();
         $limiteAdelanto = now()->startOfMonth()->addMonths(12);
         $baja = $miembro->estado === ClubMiembro::ESTADO_RETIRADO && $miembro->fecha_baja
             ? $miembro->fecha_baja->copy()->startOfMonth()
             : null;
 
-        $periodos = collect($data['periodos'])->map(fn($p) => Carbon::createFromFormat('Y-m-d', $p . '-01')->startOfDay());
+        $periodos = collect($periodosRaw)->map(fn($p) => Carbon::createFromFormat('Y-m-d', $p . '-01')->startOfDay());
 
         foreach ($periodos as $p) {
             $mes = $p->format('m/Y');
@@ -175,17 +185,29 @@ class ClubPagoController extends Controller
         }
 
         // Solo bloquear si ya tienen un pago real (> 0 Bs), permitiendo actualizar un mes exento (0 Bs)
-        $yaPagados = ClubPago::where('club_miembro_id', $miembro->id)
-            ->whereIn('periodo', $periodos->map->toDateString())
-            ->where('monto', '>', 0)
-            ->get()
-            ->map(fn($p) => $p->periodo->format('m/Y'));
+        if ($periodos->isNotEmpty()) {
+            $yaPagados = ClubPago::where('club_miembro_id', $miembro->id)
+                ->whereIn('periodo', $periodos->map->toDateString())
+                ->where('monto', '>', 0)
+                ->get()
+                ->map(fn($p) => $p->periodo->format('m/Y'));
 
-        if ($yaPagados->isNotEmpty()) {
-            return $this->errorPeriodo('Estos meses ya están pagados: ' . $yaPagados->implode(', ') . '.');
+            if ($yaPagados->isNotEmpty()) {
+                return $this->errorPeriodo('Estos meses ya están pagados: ' . $yaPagados->implode(', ') . '.');
+            }
         }
 
-        $creados = DB::transaction(function () use ($periodos, $data, $miembro, $request, $inicio) {
+        $creados = DB::transaction(function () use ($periodos, $data, $miembro, $request, $inicio, $cobrarMatricula, $montoMatricula) {
+            if ($cobrarMatricula) {
+                $miembro->update([
+                    'pago_matricula' => $miembro->pago_matricula + $montoMatricula,
+                ]);
+            }
+
+            if ($periodos->isEmpty()) {
+                return collect();
+            }
+
             // Si se solicita eximir los meses anteriores no asistidos (ej. no vino el mes 2 y vuelve a pagar en el mes 3)
             if (!empty($data['eximir_anteriores'])) {
                 $minPeriodoPagado = $periodos->min();
@@ -232,16 +254,21 @@ class ClubPagoController extends Controller
         });
 
         $cantidad = $creados->count();
-        $total = $cantidad * $data['monto'];
+        $totalMensualidades = $cantidad * (int) $data['monto'];
+        $totalGeneral = $totalMensualidades + $montoMatricula;
 
-        if ((int) $data['monto'] === 0) {
+        if ($cobrarMatricula && $cantidad === 0) {
+            $msg = "Matrícula regularizada correctamente ({$montoMatricula} Bs).";
+        } elseif ($cobrarMatricula && $cantidad > 0) {
+            $msg = "Matrícula ({$montoMatricula} Bs) y {$cantidad} mensualidad(es) registradas ({$totalGeneral} Bs en total).";
+        } elseif ((int) $data['monto'] === 0) {
             $msg = $cantidad === 1
                 ? 'Mes registrado como Permiso / No asistió (0 Bs).'
                 : "Se registraron {$cantidad} meses como Permiso / No asistió (0 Bs).";
         } else {
             $msg = $cantidad === 1
-                ? "Pago registrado correctamente ({$total} Bs)."
-                : "Se registraron {$cantidad} mensualidades ({$total} Bs).";
+                ? "Pago registrado correctamente ({$totalMensualidades} Bs)."
+                : "Se registraron {$cantidad} mensualidades ({$totalMensualidades} Bs).";
         }
 
         return response()->json([
