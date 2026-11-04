@@ -4,12 +4,29 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Gate; // 🔥 1. Importamos la fachada Gate
-use App\Models\User;                 // 🔥 2. Importamos el modelo User
-use App\Enums\Cargo;                 // 🔥 3. Importamos el Enum que creamos
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use App\Models\User;
+use App\Enums\Cargo;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * Normaliza el cargo del usuario de forma segura (soporta Enum y valores heredados en BD).
+     */
+    public static function normalizeCargo(?User $user): string
+    {
+        if (!$user) {
+            return '';
+        }
+
+        return $user->cargo instanceof Cargo
+            ? strtolower(trim($user->cargo->value))
+            : strtolower(trim((string) $user->cargo));
+    }
+
     /**
      * Register any application services.
      */
@@ -24,60 +41,72 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // ==========================================
-        // 1. TU LÓGICA DE BLADE (Mejorada para Enums)
+        // 0. PROTECCIÓN CONTRA FUERZA BRUTA (Login)
+        // ==========================================
+        RateLimiter::for('login', function (Request $request) {
+            $email = strtolower(trim((string) $request->input('email')));
+            return Limit::perMinute(5)
+                ->by($email . '|' . $request->ip())
+                ->response(function () {
+                    return response()->json([
+                        'message' => 'Demasiados intentos de inicio de sesión. Por seguridad, espere 1 minuto antes de volver a intentarlo.',
+                    ], 429);
+                });
+        });
+
+        // ==========================================
+        // 1. DIRECTIVA BLADE (Compatibilidad Web)
         // ==========================================
         Blade::if('cargo', function ($roles) {
             $user = auth()->user();
-            if (!$user) return false;
+            if (!$user || $user->estado != 1) {
+                return false;
+            }
 
             $roles = is_array($roles) ? $roles : [$roles];
+            $rolesNormalizados = array_map(fn($r) => strtolower(trim((string) $r)), $roles);
+            $cargoActual = self::normalizeCargo($user);
 
-            // Si el cargo ya es un Enum, sacamos su valor string para comparar
-            $cargoActual = $user->cargo instanceof Cargo ? $user->cargo->value : $user->cargo;
-
-            return in_array($cargoActual, $roles);
+            return in_array($cargoActual, $rolesNormalizados, true);
         });
 
         // ==========================================
-        // 2. SISTEMA DE PERMISOS "SENIOR" (Gates)
+        // 2. SISTEMA DE PERMISOS RBAC (Gates)
         // ==========================================
 
-        // El ADMIN tiene poder absoluto. Laravel ni siquiera lee lo demás si eres Admin.
+        // Si el usuario está inactivo, se bloquea cualquier acción.
+        // Si es Administrador activo, tiene acceso total.
         Gate::before(function (User $user, string $ability) {
-            if ($user->cargo === Cargo::ADMIN) {
+            if ($user->estado != 1) {
+                return false;
+            }
+
+            if (in_array(self::normalizeCargo($user), [Cargo::ADMIN->value, 'administrador'], true)) {
                 return true;
             }
+
+            return null;
         });
 
-        // Permisos específicos por acción
-        Gate::define('evaluar-paciente', function (User $user) {
-            // Solo los Kinesiólogos pueden evaluar (el Admin también entra por el Gate::before)
-            return $user->cargo->in([Cargo::KINESIOLOGO]);
+        // Gestión de usuarios (Crear, editar, activar/desactivar cuentas): Exclusivo Admin
+        Gate::define('gestionar-usuarios', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+            ], true);
         });
 
-        // Ejemplo extra:
-        Gate::define('ver-reportes', function (User $user) {
-            return $user->cargo->in([Cargo::KINESIOLOGO, Cargo::ESTUDIANTE]);
-        });
-
-        // Respaldos de BD y archivos: exclusivo del Admin.
-        // Se compara de forma segura porque `cargo` puede llegar como Enum o como string,
-        // y en la BD existen valores heredados ("Administrador") además del Enum ("admin").
+        // Respaldos de BD y archivos: Exclusivo Admin
         Gate::define('gestionar-backups', function (User $user) {
-            $cargo = $user->cargo instanceof Cargo
-                ? $user->cargo->value
-                : strtolower(trim((string) $user->cargo));
-
-            return in_array($cargo, [Cargo::ADMIN->value, 'administrador'], true);
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+            ], true);
         });
 
-        // Eliminar pacientes y sus registros asociados: solo Admin y Fisioterapeuta/Kinesiólogo.
-        Gate::define('eliminar-paciente', function (User $user) {
-            $cargo = $user->cargo instanceof Cargo
-                ? $user->cargo->value
-                : strtolower(trim((string) $user->cargo));
-
-            return in_array($cargo, [
+        // Acceso a módulo de Reportes y Estadísticas BI: Admin y Fisioterapeuta/Kinesiólogo
+        Gate::define('ver-reportes', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
                 Cargo::ADMIN->value,
                 'administrador',
                 Cargo::KINESIOLOGO->value,
@@ -85,13 +114,42 @@ class AppServiceProvider extends ServiceProvider
             ], true);
         });
 
-        // Eliminar sesiones terapéuticas: Admin, Fisioterapeuta e Interno (el Estudiante solo transcribe).
-        Gate::define('eliminar-sesion', function (User $user) {
-            $cargo = $user->cargo instanceof Cargo
-                ? $user->cargo->value
-                : strtolower(trim((string) $user->cargo));
+        // Registrar/editar evaluaciones clínicas: Personal clínico y transcripción
+        Gate::define('evaluar-paciente', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+                Cargo::INTERNO->value,
+                Cargo::ESTUDIANTE->value,
+            ], true);
+        });
 
-            return in_array($cargo, [
+        // Eliminar pacientes y sus registros asociados: Solo Admin y Fisioterapeuta/Kinesiólogo
+        Gate::define('eliminar-paciente', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+            ], true);
+        });
+
+        // Eliminar evaluaciones clínicas: Admin, Fisioterapeuta e Interno (Estudiante no elimina)
+        Gate::define('eliminar-evaluacion', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+                Cargo::INTERNO->value,
+            ], true);
+        });
+
+        // Eliminar sesiones terapéuticas: Admin, Fisioterapeuta e Interno (Estudiante no elimina)
+        Gate::define('eliminar-sesion', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
                 Cargo::ADMIN->value,
                 'administrador',
                 Cargo::KINESIOLOGO->value,

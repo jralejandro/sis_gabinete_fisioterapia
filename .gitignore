@@ -25,3 +25,8 @@ Thumbs.db
 npm-debug.log
 yarn-error.log
 *.sql
+*.pem
+*.key
+*.code-workspace
+/docker/certbot/
+/docker/nginx/certs/

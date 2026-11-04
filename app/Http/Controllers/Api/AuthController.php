@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -22,27 +23,42 @@ class AuthController extends Controller
             'password.min' => 'La contraseña debe tener al menos 6 caracteres.',
         ]);
 
-        // 2. Buscar usuario directamente por su email
-        $user = User::where('email', $request->email)->first();
+        // 2. Protección contra fuerza bruta: solo bloquea tras 5 intentos FALLIDOS en 1 minuto
+        $throttleKey = 'login:' . strtolower(trim((string) $request->email)) . '|' . $request->ip();
 
-        // 3. Verificar si el usuario está inactivo (mantenemos tu regla de negocio)
-        if ($user && $user->estado != 1) {
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
             return response()->json([
-                'message' => 'El usuario está inactivo. Contacte con el administrador.',
-            ], 403);
+                'message' => "Demasiados intentos fallidos. Por seguridad, espere {$seconds} segundos antes de volver a intentarlo.",
+            ], 429);
         }
+
+        // 3. Buscar usuario directamente por su email
+        $user = User::where('email', $request->email)->first();
 
         // 4. Verificar existencia de usuario y coincidencia de contraseña
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            RateLimiter::hit($throttleKey, 60);
+
             return response()->json([
                 'message' => 'El correo electrónico o la contraseña son incorrectos.',
             ], 401);
         }
 
-        // 5. Generar el Token de Sanctum
+        // 5. Verificar si el usuario está inactivo
+        if ($user->estado != 1) {
+            return response()->json([
+                'message' => 'El usuario está inactivo. Contacte con el administrador.',
+            ], 403);
+        }
+
+        // 6. Inicio exitoso: limpiamos el contador de intentos fallidos
+        RateLimiter::clear($throttleKey);
+
+        // 7. Generar el Token de Sanctum
         $token = $user->createToken('react-frontend')->plainTextToken;
 
-        // 6. Retornar respuesta exitosa al frontend
+        // 8. Retornar respuesta exitosa al frontend
         return response()->json([
             'message' => 'Inicio de sesión exitoso',
             'user' => $user,

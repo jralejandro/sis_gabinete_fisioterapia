@@ -86,7 +86,7 @@ class EvaluationController extends Controller
             'examenes_complementarios'   => 'required|string',
 
             // 🔥 VALIDACIÓN PARA EL PDF DEL EXAMEN COMPLEMENTARIO
-            'archivo_examen_complementario' => 'nullable|file|mimes:pdf|max:5120',
+            'archivo_examen_complementario' => 'nullable|file|mimes:pdf|mimetypes:application/pdf|max:5120',
 
             'diagnostico_kinesico'       => 'required|string',
             'objetivos_tratamiento'      => 'required|string',
@@ -185,7 +185,7 @@ class EvaluationController extends Controller
             'examenes_complementarios'   => 'required|string',
 
             // 🔥 VALIDACIÓN PARA EL PDF DEL EXAMEN COMPLEMENTARIO
-            'archivo_examen_complementario' => 'nullable|file|mimes:pdf|max:5120',
+            'archivo_examen_complementario' => 'nullable|file|mimes:pdf|mimetypes:application/pdf|max:5120',
 
             'diagnostico_kinesico'       => 'required|string',
             'objetivos_tratamiento'      => 'required|string',

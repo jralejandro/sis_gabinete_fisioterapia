@@ -51,7 +51,7 @@ class ProfileController extends Controller
             'password'         => [
                 'required',
                 'confirmed',         // Verifica password_confirmation
-                'min:5',             // Mínimo 5 caracteres
+                'min:6',             // Mínimo 6 caracteres (alineado con Login y Usuarios)
                 'regex:/[a-z]/',     // Al menos una minúscula
                 'regex:/[A-Z]/',     // Al menos una mayúscula
                 'regex:/[0-9]/',     // Al menos un número
@@ -60,7 +60,7 @@ class ProfileController extends Controller
             'current_password.required' => 'Debe ingresar su contraseña actual.',
             'password.required'         => 'Debe ingresar una nueva contraseña.',
             'password.regex'            => 'La contraseña debe tener al menos una mayúscula, una minúscula y un número.',
-            'password.min'              => 'La contraseña debe tener mínimo 5 caracteres.',
+            'password.min'              => 'La contraseña debe tener mínimo 6 caracteres.',
             'password.confirmed'        => 'La confirmación de la contraseña no coincide.',
         ]);
 

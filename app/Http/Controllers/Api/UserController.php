@@ -10,9 +10,26 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $usuarios = User::orderBy('id', 'DESC')->get();
+        if ($request->user() && $request->user()->can('gestionar-usuarios')) {
+            $usuarios = User::orderBy('id', 'DESC')->get();
+            return response()->json($usuarios);
+        }
+
+        // Para roles no-administradores (selectores de responsable clínico),
+        // devolvemos únicamente los campos públicos necesarios sin exponer CI, celular, dirección ni correo.
+        $usuarios = User::select(
+            'id',
+            'nombres',
+            'apellido_paterno',
+            'apellido_materno',
+            'cargo',
+            'profesion',
+            'nivel_academico',
+            'estado'
+        )->orderBy('id', 'DESC')->get();
+
         return response()->json($usuarios);
     }
 
@@ -130,16 +147,31 @@ class UserController extends Controller
 
         $user->update($data);
 
+        if ($request->filled('password')) {
+            $user->tokens()->delete();
+        }
+
         return response()->json([
             'message' => 'Usuario actualizado correctamente.',
             'user' => $user
         ]);
     }
 
-    public function toggle(User $user)
+    public function toggle(Request $request, User $user)
     {
+        if ($request->user() && $request->user()->id === $user->id) {
+            return response()->json([
+                'message' => 'Por seguridad, no puede inhabilitar su propia cuenta.',
+            ], 422);
+        }
+
         $user->estado = $user->estado ? 0 : 1;
         $user->save();
+
+        // Si el usuario fue desactivado, revocamos inmediatamente todos sus tokens activos
+        if (!$user->estado) {
+            $user->tokens()->delete();
+        }
 
         return response()->json([
             'message' => $user->estado ? 'Usuario activado' : 'Usuario desactivado',

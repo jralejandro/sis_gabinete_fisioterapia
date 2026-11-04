@@ -19,17 +19,24 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        $user = $request->user();
+        if ($user && $user->estado != 1) {
+            $user->currentAccessToken()?->delete();
+            return response()->json(['message' => 'Su cuenta ha sido inhabilitada.'], 401);
+        }
+        return $user;
     });
 
-    // Nueva ruta para revocar el token
+    // Ruta para revocar el token de sesión actual
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Rutas del CRUD de Usuarios
+    // Rutas del CRUD de Usuarios (Listado seguro para selectores; mutaciones exclusivas de Admin)
     Route::get('/users', [UserController::class, 'index']);
-    Route::post('/users', [UserController::class, 'store']);
-    Route::put('/users/{user}', [UserController::class, 'update']);
-    Route::patch('/users/{user}/toggle', [UserController::class, 'toggle']);
+    Route::middleware('can:gestionar-usuarios')->group(function () {
+        Route::post('/users', [UserController::class, 'store']);
+        Route::put('/users/{user}', [UserController::class, 'update']);
+        Route::patch('/users/{user}/toggle', [UserController::class, 'toggle']);
+    });
 
     // Rutas del CRUD de Pacientes
     Route::get('/patients', [PatientController::class, 'index']);
@@ -43,7 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/patients/{patient}/evaluations', [EvaluationController::class, 'store']);
     Route::get('/evaluations/{evaluation}', [EvaluationController::class, 'show']);
     Route::put('/evaluations/{evaluation}', [EvaluationController::class, 'update']);
-    Route::delete('/evaluations/{evaluation}', [EvaluationController::class, 'destroy']);
+    Route::delete('/evaluations/{evaluation}', [EvaluationController::class, 'destroy'])->middleware('can:eliminar-evaluacion');
     // Ruta exclusiva para Antecedentes Gineco-Obstétricos
     Route::put('/evaluations/{evaluation}/gyneco-obstetric', [GynecoObstetricHistoryController::class, 'updateForEvaluation']);
     // Rutas para Sesiones Clínicas
@@ -61,18 +68,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update']);
     Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
 
-    // 🔥 RUTAS DE REPORTES JSON
-    Route::get('/reports/patients', [ReportController::class, 'patients']);
-    Route::get('/reports/evaluations', [ReportController::class, 'evaluations']);
-    Route::get('/reports/sessions', [ReportController::class, 'sessions']);
-
-    // 🔥 RUTAS DE GENERACIÓN PDF
-    Route::get('/reports/patients/{patient}/pdf', [ReportController::class, 'patientPdf']);
-    Route::get('/reports/evaluations/{evaluation}/pdf', [ReportController::class, 'evaluationPdf']);
-    Route::get('/reports/sessions/{session}/pdf', [ReportController::class, 'sessionPdf']);
-
-    // 🔥 Obtener el expediente completo de 1 paciente
-    Route::get('/reports/patients/{id}/full', [ReportController::class, 'patientFullData']);
+    // 🔒 RUTAS DE REPORTES Y ESTADÍSTICAS BI (Solo Admin y Fisioterapeuta/Kinesiólogo)
+    Route::middleware('can:ver-reportes')->prefix('reports')->group(function () {
+        Route::get('/patients', [ReportController::class, 'patients']);
+        Route::get('/evaluations', [ReportController::class, 'evaluations']);
+        Route::get('/sessions', [ReportController::class, 'sessions']);
+        Route::get('/patients/{patient}/pdf', [ReportController::class, 'patientPdf']);
+        Route::get('/evaluations/{evaluation}/pdf', [ReportController::class, 'evaluationPdf']);
+        Route::get('/sessions/{session}/pdf', [ReportController::class, 'sessionPdf']);
+        Route::get('/patients/{id}/full', [ReportController::class, 'patientFullData']);
+    });
 
     // 🔒 RESPALDOS (Solo Admin)
     Route::middleware('can:gestionar-backups')->prefix('backups')->group(function () {

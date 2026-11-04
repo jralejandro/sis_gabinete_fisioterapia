@@ -15,19 +15,19 @@ class GynecoObstetricHistoryController extends Controller
      */
     public function updateForEvaluation(Request $request, $evaluationId)
     {
-        // 1. Validar datos (respetando los nombres de tus columnas en inglés)
+        // 1. Validar datos (respetando los nombres de las columnas en la BD)
         $data = $request->validate([
-            'gestations'             => 'nullable|integer|min:0',
-            'deliveries'             => 'nullable|integer|min:0',
-            'abortions'              => 'nullable|integer|min:0',
-            'cesarean_sections'      => 'nullable|integer|min:0',
-            'last_menstruation_date' => 'nullable|date',
-            'last_delivery_date'     => 'nullable|date',
-            'last_cesarean_date'     => 'nullable|date',
-            'last_abortion_date'     => 'nullable|date',
-            'menarche_age'           => 'nullable|integer|min:8|max:60',
-            'catamenial_pattern'     => 'nullable|string|max:100',
-            'menstrual_cycle'        => 'nullable|string|max:100',
+            'gestaciones'               => 'nullable|integer|min:0',
+            'partos'                    => 'nullable|integer|min:0',
+            'abortos'                   => 'nullable|integer|min:0',
+            'cesareas'                  => 'nullable|integer|min:0',
+            'fecha_ultima_menstruacion' => 'nullable|date',
+            'fecha_ultimo_parto'        => 'nullable|date',
+            'fecha_ultima_cesarea'      => 'nullable|date',
+            'fecha_ultimo_aborto'       => 'nullable|date',
+            'edad_menarca'              => 'nullable|integer|min:8|max:60',
+            'patron_catamenial'         => 'nullable|string|max:100',
+            'ciclo_menstrual'           => 'nullable|string|max:100',
         ], [
             'integer' => 'Este campo debe ser un número entero.',
             'min'     => 'El valor no puede ser menor a :min.',
