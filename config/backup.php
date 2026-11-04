@@ -41,6 +41,7 @@ return [
     */
     'directories' => [
         'public' => storage_path('app/public'), // examenes_complementarios, etc.
+        'club_tests' => storage_path('app/private/club_tests'), // tests del Club del Adulto Mayor (privados)
     ],
 
     /*

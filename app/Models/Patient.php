@@ -46,6 +46,11 @@ class Patient extends Model
         return $this->hasMany(Evaluation::class);
     }
 
+    public function clubMiembros()
+    {
+        return $this->hasMany(ClubMiembro::class);
+    }
+
     public function getEdadAttribute()
     {
         return Carbon::parse($this->fecha_nacimiento)->age;

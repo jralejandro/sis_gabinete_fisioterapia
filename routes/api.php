@@ -14,6 +14,10 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\BackupController;
+use App\Http\Controllers\Api\ClubGrupoController;
+use App\Http\Controllers\Api\ClubMiembroController;
+use App\Http\Controllers\Api\ClubPagoController;
+use App\Http\Controllers\Api\ClubTestController;
 
 Route::post('/login', [AuthController::class, 'login']);
 
@@ -85,5 +89,41 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/', [BackupController::class, 'store']);
         Route::get('/{filename}/download', [BackupController::class, 'download']);
         Route::delete('/{filename}', [BackupController::class, 'destroy']);
+    });
+
+    // 👵 CLUB DEL ADULTO MAYOR
+    Route::prefix('club')->group(function () {
+        // Consulta (todo el personal activo)
+        Route::get('/grupos', [ClubGrupoController::class, 'index']);
+        Route::get('/miembros', [ClubMiembroController::class, 'index']);
+        Route::get('/miembros/{miembro}', [ClubMiembroController::class, 'show']);
+        Route::get('/pagos', [ClubPagoController::class, 'matriz']);
+        Route::get('/tests/{test}/archivo', [ClubTestController::class, 'archivo']);
+
+        // Tests: también los puede subir el Estudiante (transcripción)
+        Route::post('/miembros/{miembro}/tests', [ClubTestController::class, 'store']);
+
+        // Gestión operativa: Admin, Fisioterapeuta e Interno
+        Route::middleware('can:gestionar-club')->group(function () {
+            Route::post('/miembros', [ClubMiembroController::class, 'store']);
+            Route::put('/miembros/{miembro}', [ClubMiembroController::class, 'update']);
+            Route::patch('/miembros/{miembro}/baja', [ClubMiembroController::class, 'baja']);
+            Route::patch('/miembros/{miembro}/reactivar', [ClubMiembroController::class, 'reactivar']);
+            Route::post('/miembros/{miembro}/pagos', [ClubPagoController::class, 'store']);
+            Route::delete('/tests/{test}', [ClubTestController::class, 'destroy']);
+        });
+
+        // Anulaciones: Admin y Fisioterapeuta
+        Route::middleware('can:anular-club')->group(function () {
+            Route::delete('/pagos/{pago}', [ClubPagoController::class, 'destroy']);
+            Route::delete('/miembros/{miembro}', [ClubMiembroController::class, 'destroy']);
+        });
+
+        // Catálogo de grupos: Solo Admin
+        Route::middleware('can:gestionar-grupos-club')->group(function () {
+            Route::post('/grupos', [ClubGrupoController::class, 'store']);
+            Route::put('/grupos/{grupo}', [ClubGrupoController::class, 'update']);
+            Route::delete('/grupos/{grupo}', [ClubGrupoController::class, 'destroy']);
+        });
     });
 });

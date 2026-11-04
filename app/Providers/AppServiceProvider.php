@@ -157,5 +157,38 @@ class AppServiceProvider extends ServiceProvider
                 Cargo::INTERNO->value,
             ], true);
         });
+
+        // ==========================================
+        // 3. CLUB DEL ADULTO MAYOR
+        // ==========================================
+
+        // Inscribir, editar, dar de baja y cobrar mensualidades: Admin, Fisioterapeuta e Interno
+        Gate::define('gestionar-club', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+                Cargo::INTERNO->value,
+            ], true);
+        });
+
+        // Anular pagos y eliminar inscripciones registradas por error: Admin y Fisioterapeuta
+        Gate::define('anular-club', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+            ], true);
+        });
+
+        // Crear/editar grupos y horarios del club: Exclusivo Admin
+        Gate::define('gestionar-grupos-club', function (User $user) {
+            return in_array(self::normalizeCargo($user), [
+                Cargo::ADMIN->value,
+                'administrador',
+            ], true);
+        });
     }
 }

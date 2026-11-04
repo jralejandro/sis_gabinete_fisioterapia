@@ -171,6 +171,15 @@ class PatientController extends Controller
                 }
             }
 
+            // Eliminar archivos privados de tests del Club del Adulto Mayor
+            foreach ($patient->clubMiembros()->with('tests')->get() as $miembro) {
+                foreach ($miembro->tests as $test) {
+                    if (!empty($test->archivo)) {
+                        Storage::disk(\App\Models\ClubTest::DISK)->delete($test->archivo);
+                    }
+                }
+            }
+
             // Al eliminar al paciente, la BD elimina en cascada antecedentes,
             // evaluaciones, sesiones terapéuticas, gineco-obstétricos y fichas de alta.
             $patient->delete();
