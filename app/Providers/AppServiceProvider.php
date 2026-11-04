@@ -70,5 +70,34 @@ class AppServiceProvider extends ServiceProvider
 
             return in_array($cargo, [Cargo::ADMIN->value, 'administrador'], true);
         });
+
+        // Eliminar pacientes y sus registros asociados: solo Admin y Fisioterapeuta/Kinesiólogo.
+        Gate::define('eliminar-paciente', function (User $user) {
+            $cargo = $user->cargo instanceof Cargo
+                ? $user->cargo->value
+                : strtolower(trim((string) $user->cargo));
+
+            return in_array($cargo, [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+            ], true);
+        });
+
+        // Eliminar sesiones terapéuticas: Admin, Fisioterapeuta e Interno (el Estudiante solo transcribe).
+        Gate::define('eliminar-sesion', function (User $user) {
+            $cargo = $user->cargo instanceof Cargo
+                ? $user->cargo->value
+                : strtolower(trim((string) $user->cargo));
+
+            return in_array($cargo, [
+                Cargo::ADMIN->value,
+                'administrador',
+                Cargo::KINESIOLOGO->value,
+                'fisioterapeuta',
+                Cargo::INTERNO->value,
+            ], true);
+        });
     }
 }

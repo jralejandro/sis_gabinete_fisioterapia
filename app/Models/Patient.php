@@ -27,6 +27,7 @@ class Patient extends Model
         'persona_referencia',
         'celular_referencia',
         'medio_contacto', // 🔥 AGREGAMOS ESTE
+        'medio_contacto_otro',
         'estado',
         'user_id'
     ];

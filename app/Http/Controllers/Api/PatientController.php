@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api; // Cambia a App\Http\Controllers si no usas 
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class PatientController extends Controller
@@ -36,6 +38,7 @@ class PatientController extends Controller
             'fecha_nacimiento.required' => 'La fecha de nacimiento es obligatoria.',
             'fecha_nacimiento.date'     => 'La fecha de nacimiento no tiene un formato válido.',
             'estado_civil.required'     => 'El estado civil es obligatorio.',
+            'medio_contacto_otro.required_if' => 'Debe especificar cómo se enteró del gabinete si seleccionó "Otro".',
         ];
     }
 
@@ -74,10 +77,14 @@ class PatientController extends Controller
             'persona_referencia'  => 'nullable|string|max:255',
             'celular_referencia'  => 'nullable|string|max:20',
             'medio_contacto'      => 'nullable|string|max:255', // 🔥 NUEVO CAMPO DE MARKETING
+            'medio_contacto_otro' => 'nullable|required_if:medio_contacto,Otro|string|max:255',
         ], $this->mensajesValidacion());
 
-        // Normalizar complemento
+        // Normalizar complemento y limpiar medio_contacto_otro si no eligió "Otro"
         $validatedData['complemento'] = !empty($validatedData['complemento']) ? strtoupper($validatedData['complemento']) : null;
+        if (($validatedData['medio_contacto'] ?? null) !== 'Otro') {
+            $validatedData['medio_contacto_otro'] = null;
+        }
 
         // Vincular al usuario (fisioterapeuta/interno) que registra al paciente
         $validatedData['user_id'] = auth()->id();
@@ -125,9 +132,13 @@ class PatientController extends Controller
             'persona_referencia'  => 'nullable|string|max:255',
             'celular_referencia'  => 'nullable|string|max:20',
             'medio_contacto'      => 'nullable|string|max:255', // 🔥 NUEVO CAMPO DE MARKETING
+            'medio_contacto_otro' => 'nullable|required_if:medio_contacto,Otro|string|max:255',
         ], $this->mensajesValidacion());
 
         $validatedData['complemento'] = !empty($validatedData['complemento']) ? strtoupper($validatedData['complemento']) : null;
+        if (($validatedData['medio_contacto'] ?? null) !== 'Otro') {
+            $validatedData['medio_contacto_otro'] = null;
+        }
 
         $patient->update($validatedData);
 
@@ -145,5 +156,28 @@ class PatientController extends Controller
             ->findOrFail($id);
 
         return response()->json($patient);
+    }
+
+    /**
+     * Eliminar un paciente y todos sus registros y archivos clínicos asociados
+     */
+    public function destroy(Patient $patient)
+    {
+        DB::transaction(function () use ($patient) {
+            // Eliminar archivos físicos de exámenes complementarios si existen
+            foreach ($patient->evaluations as $evaluation) {
+                if (!empty($evaluation->archivo_examen_complementario)) {
+                    Storage::disk('public')->delete($evaluation->archivo_examen_complementario);
+                }
+            }
+
+            // Al eliminar al paciente, la BD elimina en cascada antecedentes,
+            // evaluaciones, sesiones terapéuticas, gineco-obstétricos y fichas de alta.
+            $patient->delete();
+        });
+
+        return response()->json([
+            'message' => 'Paciente y todos sus registros clínicos eliminados correctamente.',
+        ]);
     }
 }

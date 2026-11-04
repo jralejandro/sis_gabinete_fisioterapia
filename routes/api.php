@@ -35,6 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/patients', [PatientController::class, 'index']);
     Route::post('/patients', [PatientController::class, 'store']);
     Route::put('/patients/{patient}', [PatientController::class, 'update']);
+    Route::delete('/patients/{patient}', [PatientController::class, 'destroy'])->middleware('can:eliminar-paciente');
     Route::get('/patients/{id}/work', [PatientController::class, 'work']);
     Route::put('/patients/{patient}/antecedents', [AntecedentController::class, 'updateForPatient']);
 
@@ -48,7 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Rutas para Sesiones Clínicas
     Route::post('/evaluations/{evaluation}/sessions', [TherapySessionController::class, 'store']);
     Route::put('/sessions/{session}', [TherapySessionController::class, 'update']);
-    Route::delete('/sessions/{session}', [TherapySessionController::class, 'destroy']);
+    Route::delete('/sessions/{session}', [TherapySessionController::class, 'destroy'])->middleware('can:eliminar-sesion');
 
     // Ruta ÚNICA para Ficha de Alta (Crea y Edita)
     Route::post('/discharge-records', [DischargeRecordController::class, 'store']);

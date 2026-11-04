@@ -33,7 +33,7 @@ class User extends Authenticatable
         'nro_celular',
         'direccion',
         'email',
-        'cargo' => Cargo::class,
+        'cargo',
         'nivel_academico',
         'profesion',
         'estado',

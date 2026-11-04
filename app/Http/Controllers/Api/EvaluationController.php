@@ -52,7 +52,7 @@ class EvaluationController extends Controller
         $validated = $request->validate([
             'motivo_consulta'            => 'required|string',
             'medico_referencia'          => 'nullable|string',
-            'centro_referencia'          => 'nullable|string',
+            'centro_referencia'          => 'nullable|string|max:255',
             'diagnostico_medico'         => 'required|string',
             'diagnostico_medico_otro'    => 'required_if:diagnostico_medico,Otro',
             'costo_evaluacion'           => 'required|numeric',
@@ -151,7 +151,7 @@ class EvaluationController extends Controller
         $validated = $request->validate([
             'motivo_consulta'            => 'required|string',
             'medico_referencia'          => 'nullable|string',
-            'centro_referencia'          => 'nullable|string',
+            'centro_referencia'          => 'nullable|string|max:255',
             'diagnostico_medico'         => 'required|string',
             'diagnostico_medico_otro'    => 'required_if:diagnostico_medico,Otro',
             'costo_evaluacion'           => 'required|numeric',
