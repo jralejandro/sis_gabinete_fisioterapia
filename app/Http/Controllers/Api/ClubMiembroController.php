@@ -257,7 +257,7 @@ class ClubMiembroController extends Controller
                             'periodo'         => $periodoMes,
                         ],
                         [
-                            'monto'         => $data['monto_primer_mes'] ?? 30,
+                            'monto'         => $data['monto_primer_mes'] ?? 60,
                             'fecha_pago'    => $data['fecha_inscripcion'],
                             'observaciones' => 'Pagado al momento de su reincorporación.',
                             'created_by'    => $request->user()->id,
@@ -289,7 +289,7 @@ class ClubMiembroController extends Controller
                 ClubPago::create([
                     'club_miembro_id' => $miembro->id,
                     'periodo'         => Carbon::parse($data['fecha_inscripcion'])->startOfMonth()->toDateString(),
-                    'monto'           => $data['monto_primer_mes'] ?? 30,
+                    'monto'           => $data['monto_primer_mes'] ?? 60,
                     'fecha_pago'      => $data['fecha_inscripcion'],
                     'observaciones'   => 'Pagado al momento de la inscripción.',
                     'created_by'      => $request->user()->id,
@@ -429,7 +429,7 @@ class ClubMiembroController extends Controller
                         'periodo'         => $periodoMes,
                     ],
                     [
-                        'monto'         => $data['monto_mes_actual'] ?? 30,
+                        'monto'         => $data['monto_mes_actual'] ?? 60,
                         'fecha_pago'    => $data['fecha_reincorporacion'],
                         'observaciones' => 'Pagado al momento de su reincorporación.',
                         'created_by'    => $request->user()->id,

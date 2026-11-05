@@ -145,7 +145,7 @@ class ClubPagoController extends Controller
             'observaciones'     => 'nullable|string|max:255',
             'eximir_anteriores' => 'nullable|boolean',
             'cobrar_matricula'  => 'nullable|boolean',
-            'monto_matricula'   => 'nullable|integer|min:1|max:10000',
+            'monto_matricula'   => 'nullable|integer|min:0|max:10000',
         ], [
             'periodos.*.regex'      => 'El mes seleccionado no tiene un formato válido.',
             'periodos.*.distinct'   => 'Hay meses repetidos en la selección.',
@@ -157,6 +157,9 @@ class ClubPagoController extends Controller
 
         $cobrarMatricula = !empty($data['cobrar_matricula']);
         $montoMatricula = $cobrarMatricula ? (int) ($data['monto_matricula'] ?? 50) : 0;
+        if ($cobrarMatricula && $montoMatricula <= 0) {
+            $montoMatricula = 50;
+        }
         $periodosRaw = $data['periodos'] ?? [];
 
         if (empty($periodosRaw) && !$cobrarMatricula) {
